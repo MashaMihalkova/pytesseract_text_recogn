@@ -1,11 +1,39 @@
 import numpy as np
 import pytesseract
 import cv2
-
+from remove_table import *
 
 def sort2(val):  # helper for sorting by y
     return val[1]
 
+def rec_txt(crop_img,row,path_to_img, PATH_TO_SAVE, color_grey, filter_, rm):
+
+    recognized_string = pytesseract.image_to_string(crop_img, lang="rus")
+    row.append(recognized_string.replace("\n", " "))
+    print(recognized_string)
+    p = path_to_img[:-4].split("\\")
+
+    with open(PATH_TO_SAVE + str(p[-1:][0]) + f'_table_{rm}_{color_grey}_{filter_}.txt', 'a+') as f:
+        f.write(str(recognized_string))
+
+def improve_image_quality(crop_img):
+    max_v = 200
+    min_v = 100
+    mid_tone = 128
+    other_max_v = 255
+    other_min_v = 0
+    gamma = 1
+    # img = crop_img
+    img = crop_img.astype(int)
+    sub = (img - min_v)
+    img = 255 * (sub / (max_v - min_v))
+    if mid_tone != 128:
+        img = 255 * ((img / 255) ** gamma)
+        img[img > 255] = 255
+    img = (img / 255) * (other_max_v - other_min_v) + other_min_v
+    img = np.clip(img, 0, 255)
+    crop_img = img.astype(np.uint8)
+    return crop_img
 
 def recogn_table(path_to_img: str, PATH_TO_SAVE:str, color_grey: str, filter_: str):
     image = cv2.imread(path_to_img)
@@ -57,16 +85,27 @@ def recogn_table(path_to_img: str, PATH_TO_SAVE:str, color_grey: str, filter_: s
                 clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
                 crop_img = clahe.apply(crop_img)
 
-        # cv2.imshow('crop', crop_img)
+        crop_img = improve_image_quality(crop_img)
+        crop_img_rm_table = remove_table(crop_img, color_grey)
+        # cv2.imshow('crop', crop_img_rm_table)
         # cv2.waitKey()
+        rec_txt(crop_img, row, path_to_img, PATH_TO_SAVE, color_grey, filter_, rm='')
+        rec_txt(crop_img_rm_table, row, path_to_img, PATH_TO_SAVE, color_grey, filter_, rm='rm')
 
-        recognized_string = pytesseract.image_to_string(crop_img, lang="rus")
-        row.append(recognized_string.replace("\n", " "))
-        print(recognized_string)
-        p = path_to_img[:-4].split("\\")
-
-        with open(PATH_TO_SAVE+str(p[-1:][0]) + f'_table_{color_grey}_{filter_}.txt', 'a+') as f:
-            f.write(str(recognized_string))
+        # recognized_string = pytesseract.image_to_string(crop_img_rm_table, lang="rus")
+        # row.append(recognized_string.replace("\n", " "))
+        # print(recognized_string)
+        # p = path_to_img[:-4].split("\\")
+        #
+        # with open(PATH_TO_SAVE + str(p[-1:][0]) + f'_table_rm_{color_grey}_{filter_}.txt', 'a+') as f:
+        #     f.write(str(recognized_string))
+        #
+        # recognized_string = pytesseract.image_to_string(crop_img, lang="rus")
+        # row.append(recognized_string.replace("\n", " "))
+        # print(recognized_string)
+        #
+        # with open(PATH_TO_SAVE+str(p[-1:][0]) + f'_table_{color_grey}_{filter_}.txt', 'a+') as f:
+        #     f.write(str(recognized_string))
 
         prev_y = y
     recognized_table
